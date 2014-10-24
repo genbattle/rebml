@@ -1,0 +1,5 @@
+[package]
+
+name = "rebml"
+version = "0.0.1"
+authors = ["Nick Sarten <gen.battle@gmail.com>"]
