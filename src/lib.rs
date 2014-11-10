@@ -20,10 +20,21 @@
 //extern crate time;
 //use std::io::Memreader;
 //use time::Timespec;
-use std::io;
 
 mod rebml {
+    use time::Timespec;
+    enum Value {
+		Uint(u64),
+		Int(i64),
+		Str(String),
+		DateTimespec),
+		Bin(&[u8]),
+        SubElement,
+		Nil, // Empty element
+	}
+
     mod incremental {
+        use std::io::{IoResult,IoError};
         pub struct Parser {
             input: &Reader,
             id: u32,
@@ -31,32 +42,63 @@ mod rebml {
         }
 
         impl Parser {
-            // Create new EBML Parser and read in the first tag, if any. Consumes the input stream.
-            fn new(&self) -> IoResult<Parser> {
-
+            /*
+            Create new EBML Parser and read in the first tag, if any. Expects the stream to start with the top-level
+            EBML tag [1A][45][DF][A3]. Consumes the input stream.
+            */
+            pub fn new(input: Reader) -> IoResult<Parser> {
+                let mut parser: Parser;
+                parser.input = input;
+                match parser.read_id() {
+                    Ok(val) => parser.id = val,
+                    Err(err) => return err,
+                }
+                match parser.read_size() {
+                    Ok(val) => parser.size = val,
+                    Err(err) => return err
+                }
             }
 
             /*
             Get next the next node after this one in the given input stream.
             */
-            fn next(&self) -> Option<IoError> {
+            pub fn next(&self) -> Option<IoError> {
             }
 
             /*
             Get the subnode below this one, if any exists (returns IoError on failure)
             */
-            fn down(&self) -> Option<IoError> {
+            pub fn down(&self) -> Option<IoError> {
             }
 
             /*
             Get the current depth in the Element tree
             */
-            fn level(&self) -> u32 {}
+            pub fn level(&self) -> u32 {}
 
             /*
             Get the value of this node
             */
-            fn value(input: &Reader) -> IoResult<Value> {
+            pub fn value(input: &Reader) -> IoResult<Value> {
+            }
+
+            /*
+            Helper function to read an id from the stream
+            */
+            fn read_id(&self) -> IoResult<u32> {
+                // read first byte
+                let u8 = match self.input.read_byte() {
+                    Ok(val) => val,
+                    Err(err) => return err, // TODO: will this actually return from fn? is there a better way to format this block?
+                }
+                // TODO: Count zeroes to get number of trailing bytes
+                // TODO: Read trailing bytes
+            }
+
+            /*
+            Helper function to read size from the stream
+            */
+            fn read_size(&self) -> IoResult<u64> {
             }
         }
     }
