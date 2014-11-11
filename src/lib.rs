@@ -49,14 +49,9 @@ mod rebml {
             pub fn new(input: Reader) -> IoResult<Parser> {
                 let mut parser: Parser;
                 parser.input = input;
-                match parser.read_id() {
-                    Ok(val) => parser.id = val,
-                    Err(err) => return err,
-                }
-                match parser.read_size() {
-                    Ok(val) => parser.size = val,
-                    Err(err) => return err
-                }
+                parser.id = try!(self.read_id());
+                parser.size = try!(self.read_size());
+                return parser;
             }
 
             /*
@@ -83,16 +78,35 @@ mod rebml {
             }
 
             /*
+            Helper function to extract the (remaining) byte count for a UTF-8-like value
+            */
+            fn byte_count(firstbyte: &u8) -> u8 {
+                let mut mask = 0x80;
+                let mut bytecount = 0;
+                while firstbyte & mask == 0 {
+                    firstbyte = firstbyte << 1;
+                    bytecount += 1;
+                }
+                return bytecount;
+            }
+
+            /*
             Helper function to read an id from the stream
             */
             fn read_id(&self) -> IoResult<u32> {
                 // read first byte
-                let u8 = match self.input.read_byte() {
-                    Ok(val) => val,
-                    Err(err) => return err, // TODO: will this actually return from fn? is there a better way to format this block?
-                }
-                // TODO: Count zeroes to get number of trailing bytes
-                // TODO: Read trailing bytes
+                let firstbyte = try!(self.input.read_byte());
+                // Count zeroes to get number of trailing bytes
+                let mut count = byte_count(firstbyte);
+                let mut offset = 24;
+                let mut id: u32 = firstbyte as u32 << offset;
+                // TODO: Read trailing bytes and add them to the id
+				let bytes = try!(self.input.read_exact(count));
+				// functional method?
+				id += bytes.iter()
+				.zip(range_step(16, -1, -8))
+				.fold(|acc, (i, o)| i as u32 << o);
+				return id;
             }
 
             /*
@@ -102,4 +116,11 @@ mod rebml {
             }
         }
     }
+    
+    [#test]
+    fn test_new() {
+		let bytes = vec![0x1Au8, 0x45, 0xDF, 0xA3, 0x80];
+		let buf = BufReader::new(bytes)
+		assert!(Parser::new(buf).is_ok());
+	}
 }
