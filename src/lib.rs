@@ -51,6 +51,10 @@ mod rebml {
                 parser.input = input;
                 parser.id = try!(self.read_id());
                 parser.size = try!(self.read_size());
+                if (parser.id != 0x1A45DFA3) {
+                    // Return error, first tag isn't EBML tag.
+                    // TODO: I have a feeling this can be done better using a match statement or something for the parser.id assignment.
+                }
                 return parser;
             }
 
@@ -78,7 +82,7 @@ mod rebml {
             }
 
             /*
-            Helper function to extract the (remaining) byte count for a UTF-8-like value
+            Helper function to extract the (remaining) byte count for a UTF-8-like value from the first byte
             */
             fn byte_count(firstbyte: &u8) -> u8 {
                 let mut mask = 0x80;
@@ -98,25 +102,37 @@ mod rebml {
                 let firstbyte = try!(self.input.read_byte());
                 // Count zeroes to get number of trailing bytes
                 let mut count = byte_count(firstbyte);
-                let mut offset = 24;
-                let mut id: u32 = firstbyte as u32 << offset;
-                // TODO: Read trailing bytes and add them to the id
-				let bytes = try!(self.input.read_exact(count));
-				// functional method?
-				id += bytes.iter()
-				.zip(range_step(16, -1, -8))
-				.fold(|acc, (i, o)| i as u32 << o);
-				return id;
+                let mut id: u32 = firstbyte as u32 << (32 - 8);
+                // Read trailing bytes and add them to the id
+                let bytes = try!(self.input.read_exact(count));
+                // integrate the rest of the bytes into the size
+                id += bytes.iter()
+                .zip(range_step(32 - 16, -1, -8))
+                .fold(|acc, (i, o)| i as u32 << o);
+              	return id;
             }
 
             /*
             Helper function to read size from the stream
             */
             fn read_size(&self) -> IoResult<u64> {
+                // read first byte
+                let firstbyte = try!(self.input.read_byte());
+                // Count zeroes to get number of trailing bytes
+                let mut count = byte_count(firstbyte);
+                // Compose the first byte into the size, but cancel out the first one, which isn't part of the actual size
+                let mut size: u64 = (firstbyte & !(0x80 >> count)) as u64 << (64 - 8);
+                // Read trailing bytes and add them to the size
+                let bytes = try!(self.input.read_exact(count));
+                // integrate bytes into size
+                id += bytes.iter()
+                .zip(range_step(64 - 16, -1, -8))
+                .fold(|acc, (i, o)| i as u64 << o);
+                return id;
             }
         }
     }
-    
+
     [#test]
     fn test_new() {
 		let bytes = vec![0x1Au8, 0x45, 0xDF, 0xA3, 0x80];
